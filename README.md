@@ -1,6 +1,6 @@
 ## Artosyn Firmware Tools
 
-Tools to deal with Artosyn ARTO v4 firmware image files.
+Tools to deal with Artosyn ARTO v4 firmware image files. Inspired by [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools).
 
 ## Installing
     git clone https://github.com/fpv-wtf/ar-firmware-tools
