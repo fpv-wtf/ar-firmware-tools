@@ -5,6 +5,7 @@ meta:
 seq:
   - id: header
     type: header
+  #tbd
   - id: unknown2
     size: 224
   - id: header_ext
@@ -33,13 +34,15 @@ seq:
     repeat-expr: header.segments1
 instances:
   segments0:
-    type: file_body(segment_info0[_index].img_offset, segment_info0[_index].compressed_size) # <= pass `_index` into file_body
+    type: file_body(segment_info0[_index].img_offset, segment_info0[_index].compressed_size)
     repeat: expr
     repeat-expr: header.segments0
   segments1:
-    type: file_body(segment_info1[_index].img_offset, segment_info1[_index].compressed_size) # <= pass `_index` into file_body
+    type: file_body(segment_info1[_index].img_offset, segment_info1[_index].compressed_size)
     repeat: expr
     repeat-expr: header.segments1
+  #version:
+  #  type: file_body(segment_info0[header.segments0-1].img_offset+segment_info0[header.segments0-1].compressed_size, 100)
 types:
   header:
     seq:
@@ -86,9 +89,9 @@ types:
       - id: reserve
         size: 14
       - id: hash
-        size: 32
+        size: hash_size
       - id: signature
-        size: 32
+        size: sig_size
   header_ext:
     seq:
       - id: sdk_version
@@ -125,9 +128,9 @@ types:
         type: u8
   file_body:
     params:
-      - id: offset               # => receive `_index` as `i` here
+      - id: offset            
         type: u8
-      - id: length               # => receive `_index` as `i` here
+      - id: length             
         type: u8
     instances:
       body:

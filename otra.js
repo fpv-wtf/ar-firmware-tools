@@ -22,6 +22,10 @@ yargs(hideBin(process.argv))
   }, (argv) => {
     const fileContent = fs.readFileSync(argv.image);
     const parsedOtra = new Otra(new KaitaiStream(fileContent));
+
+    parsedOtra.partInfo0 = mapPartsToSegments(parsedOtra.partInfo0, parsedOtra.segmentInfo0, parsedOtra.segments0);
+    parsedOtra.partInfo1 = mapPartsToSegments(parsedOtra.partInfo1, parsedOtra.segmentInfo1, parsedOtra.segments1);
+
     if(!argv.folder) {
         argv.folder = "./"+path.basename(argv.image).replace(/.img$/, '');
     }
@@ -29,20 +33,38 @@ yargs(hideBin(process.argv))
     fs.mkdirSync(argv.folder)
     console.log(`extracting image file: ${argv.image}`);
 
-    function writeFile(file, data, decompressedSize) {
-        console.log("writing: "+argv.folder+"/"+file)
+    function writeFile(file, data, decompressedSize, append) {
+        console.log("writing: "+argv.folder+"/"+file + (append ? " +" : ""))
         const buffer = Buffer.from(data)
-        fs.writeFileSync(argv.folder+"/"+file, (decompressedSize && parsedOtra.header.compressed ? lzo.decompress(buffer, decompressedSize) : buffer))
+        fs.writeFileSync(argv.folder+"/"+file, (decompressedSize && parsedOtra.header.compressed ? lzo.decompress(buffer, decompressedSize) : buffer), 
+        append ? {
+          flag: "a+"
+        } : null)
     }
     writeFile("rom.bin", parsedOtra.rom)
     writeFile("loader.bin", parsedOtra.loader)
     writeFile("env.bin", parsedOtra.env)
+    
 
-    parsedOtra.segmentInfo0.forEach((segment, index) => {
+    function writePart(part) {
+      part.segments.forEach((segment, index) => {
+        writeFile(part.name+".bin", segment.data.body, segment.decompressedSize, (index !== 0))
+      })
+    }
+
+    parsedOtra.partInfo0.forEach(writePart);
+    parsedOtra.partInfo1.forEach(writePart);
+
+    
+
+    /*parsedOtra.segmentInfo0.forEach((segment, index) => {
         const partitions = parsedOtra.partInfo0.filter((part)=>{ return part.flashOffset === segment.flashOffset}).map((part) => { return part.name })
         const partition = partitions.length ? partitions.pop() : segment.flashOffset
         writeFile(partition+".bin", parsedOtra.segments0[index].body, segment.decompressedSize)
     })
+    */
+
+
 
   })
   .command('info <image>', 'show info on the OTRA image', (yargs) => {
@@ -53,7 +75,14 @@ yargs(hideBin(process.argv))
   }, (argv) => {
     const fileContent = fs.readFileSync(argv.image);
     const parsedOtra = new Otra(new KaitaiStream(fileContent));
+
+    parsedOtra.partInfo0 = mapPartsToSegments(parsedOtra.partInfo0, parsedOtra.segmentInfo0, parsedOtra.segments0);
+    parsedOtra.partInfo1 = mapPartsToSegments(parsedOtra.partInfo1, parsedOtra.segmentInfo1, parsedOtra.segments1);
+
     console.log(`image file: ${argv.image}
+
+header version: ${parsedOtra.header.headerVersion}
+sdk version: ${parsedOtra.headerExt.sdkVersion}
 
 hash size:${parsedOtra.header.hashSize}
 signature size:${parsedOtra.header.sigSize}
@@ -82,7 +111,8 @@ partitions0:`);
             name: part.name,
             offset: part.flashOffset,
             size: humanFileSize(part.length),
-            upgrade: Boolean(part.isUpgrade)
+            upgrade: Boolean(part.isUpgrade),
+            segments: part.segments.length
         }
     }))
     if(parsedOtra.header.partitions1) {
@@ -92,7 +122,9 @@ partitions0:`);
                 name: part.name,
                 offset: part.flashOffset,
                 size: humanFileSize(part.length),
-                upgrade: Boolean(part.isUpgrade)
+                upgrade: Boolean(part.isUpgrade),
+                segments: part.segments.length
+
             }
         }))
     }
@@ -105,7 +137,7 @@ partitions0:`);
             compressedSize: humanFileSize(segment.compressedSize),
             decompressedSize: humanFileSize(segment.decompressedSize),
             partition: parsedOtra.partInfo0.filter((part)=>{
-                return part.flashOffset === segment.flashOffset
+                return segment.flashOffset >= part.flashOffset && segment.flashOffset < part.flashOffset + part.length
             }).map((part) => { return part.name }).pop() 
         }
     }))
@@ -118,7 +150,7 @@ partitions0:`);
                 compressedSize: humanFileSize(segment.compressedSize),
                 decompressedSize: humanFileSize(segment.decompressedSize),
                 partition: parsedOtra.partInfo1.filter((part)=>{
-                    part.flashOffset == segment.flashOffset
+                  return segment.flashOffset >= part.flashOffset && segment.flashOffset < part.flashOffset + part.length
                 }).map((part) => { return part.name })
             }
         }))
@@ -130,7 +162,18 @@ partitions0:`);
   .parse()
 
 
-
+// i don't think this can be trivially done with kaitai but would be happy ot be proven wrong
+function mapPartsToSegments(parts, segments, datas) {
+  segments = segments.map((segment, index)=>{ return {...segment, data:datas[index]} })
+  return parts.map((part)=>{ 
+    return {
+      ...part,
+      segments: segments.filter((segment)=>{
+        return segment.flashOffset >= part.flashOffset && segment.flashOffset < part.flashOffset + part.length
+      })
+    }
+  })
+}
 
 
 function humanFileSize(bytes, si=false, dp=1) {

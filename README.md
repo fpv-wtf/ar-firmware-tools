@@ -18,8 +18,13 @@ Tools to deal with Artosyn ARTO v4 firmware image files. Inspired by [dji-firmwa
     --help     Show help                                 [boolean]
     --version  Show version number                       [boolean]
 
+## Tips
+To make the ext4 file system from Avatar Sky mountable:
+
+    dd if=/dev/zero bs=1 seek=134217728 count=0 of=userapp0.bin
+
 ## Format Definition
-Defined using [Kaitai](https://kaitai.io/) see [otra.ksc](./otra.ksc). You can use the [Kaitai IDE](https://ide.kaitai.io/) to fill in the blanks or explore files.
+Defined using [Kaitai](https://kaitai.io/) see [otra.ksy](./otra.ksy). You can use the [Kaitai IDE](https://ide.kaitai.io/) to fill in the blanks or explore files.
 
 To renegerate the javascript bindings: 
 
