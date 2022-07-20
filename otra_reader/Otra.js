@@ -19,26 +19,38 @@ var Otra = (function() {
   }
   Otra.prototype._read = function() {
     this.header = new Header(this._io, this, this._root);
-    this.unknown2 = this._io.readBytes(224);
-    this.headerExt = new HeaderExt(this._io, this, this._root);
+    if (this.header.headerVersion > 3) {
+      this.unknown2 = this._io.readBytes(224);
+    }
+    if (this.header.headerVersion > 3) {
+      this.headerExt = new HeaderExt(this._io, this, this._root);
+    }
     this.rom = this._io.readBytes(this.header.romSize);
     this.loader = this._io.readBytes(this.header.loaderSize);
     this.env = this._io.readBytes(this.header.envSize);
-    this.partInfo0 = new Array(this.header.partitions0);
-    for (var i = 0; i < this.header.partitions0; i++) {
-      this.partInfo0[i] = new PartInfo(this._io, this, this._root);
+    if (this.header.headerVersion > 1) {
+      this.partInfo0 = new Array(this.header.partitions0);
+      for (var i = 0; i < this.header.partitions0; i++) {
+        this.partInfo0[i] = new PartInfo(this._io, this, this._root);
+      }
     }
-    this.partInfo1 = new Array(this.header.partitions1);
-    for (var i = 0; i < this.header.partitions1; i++) {
-      this.partInfo1[i] = new PartInfo(this._io, this, this._root);
+    if (this.header.headerVersion > 1) {
+      this.partInfo1 = new Array(this.header.partitions1);
+      for (var i = 0; i < this.header.partitions1; i++) {
+        this.partInfo1[i] = new PartInfo(this._io, this, this._root);
+      }
     }
-    this.segmentInfo0 = new Array(this.header.segments0);
-    for (var i = 0; i < this.header.segments0; i++) {
-      this.segmentInfo0[i] = new SegmentInfo(this._io, this, this._root);
+    if (this.header.headerVersion > 1) {
+      this.segmentInfo0 = new Array(this.header.segments0);
+      for (var i = 0; i < this.header.segments0; i++) {
+        this.segmentInfo0[i] = new SegmentInfo(this._io, this, this._root);
+      }
     }
-    this.segmentInfo1 = new Array(this.header.segments1);
-    for (var i = 0; i < this.header.segments1; i++) {
-      this.segmentInfo1[i] = new SegmentInfo(this._io, this, this._root);
+    if (this.header.headerVersion > 1) {
+      this.segmentInfo1 = new Array(this.header.segments1);
+      for (var i = 0; i < this.header.segments1; i++) {
+        this.segmentInfo1[i] = new SegmentInfo(this._io, this, this._root);
+      }
     }
   }
 
@@ -91,8 +103,8 @@ var Otra = (function() {
       this.objectVersion = this._io.readU4le();
       this.dependVersion = this._io.readU4le();
       this.reserve = this._io.readBytes(14);
-      this.hash = this._io.readBytes(32);
-      this.signature = this._io.readBytes(32);
+      this.hash = this._io.readBytes(this.hashSize);
+      this.signature = this._io.readBytes(Math.floor(this.sigSize / 8));
     }
 
     return Header;
@@ -162,9 +174,11 @@ var Otra = (function() {
     get: function() {
       if (this._m_segments0 !== undefined)
         return this._m_segments0;
-      this._m_segments0 = new Array(this.header.segments0);
-      for (var i = 0; i < this.header.segments0; i++) {
-        this._m_segments0[i] = new FileBody(this._io, this, this._root, this.segmentInfo0[i].imgOffset, this.segmentInfo0[i].compressedSize);
+      if (this.header.headerVersion > 1) {
+        this._m_segments0 = new Array(this.header.segments0);
+        for (var i = 0; i < this.header.segments0; i++) {
+          this._m_segments0[i] = new FileBody(this._io, this, this._root, this.segmentInfo0[i].imgOffset, this.segmentInfo0[i].compressedSize);
+        }
       }
       return this._m_segments0;
     }
@@ -173,9 +187,11 @@ var Otra = (function() {
     get: function() {
       if (this._m_segments1 !== undefined)
         return this._m_segments1;
-      this._m_segments1 = new Array(this.header.segments1);
-      for (var i = 0; i < this.header.segments1; i++) {
-        this._m_segments1[i] = new FileBody(this._io, this, this._root, this.segmentInfo1[i].imgOffset, this.segmentInfo1[i].compressedSize);
+      if (this.header.headerVersion > 1) {
+        this._m_segments1 = new Array(this.header.segments1);
+        for (var i = 0; i < this.header.segments1; i++) {
+          this._m_segments1[i] = new FileBody(this._io, this, this._root, this.segmentInfo1[i].imgOffset, this.segmentInfo1[i].compressedSize);
+        }
       }
       return this._m_segments1;
     }

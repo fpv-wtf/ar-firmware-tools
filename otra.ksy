@@ -5,11 +5,12 @@ meta:
 seq:
   - id: header
     type: header
-  #tbd
   - id: unknown2
     size: 224
+    if: header.header_version > 3
   - id: header_ext
     type: header_ext
+    if: header.header_version > 3
   - id: rom
     size: header.rom_size
   - id: loader
@@ -18,27 +19,33 @@ seq:
     size: header.env_size
   - id: part_info0
     type: part_info
+    if: header.header_version > 1
     repeat: expr
     repeat-expr: header.partitions0
   - id: part_info1
     type: part_info
+    if: header.header_version > 1
     repeat: expr
     repeat-expr: header.partitions1
   - id: segment_info0
     type: segment_info
+    if: header.header_version > 1
     repeat: expr
     repeat-expr: header.segments0
   - id: segment_info1
     type: segment_info
+    if: header.header_version > 1
     repeat: expr
     repeat-expr: header.segments1
 instances:
   segments0:
     type: file_body(segment_info0[_index].img_offset, segment_info0[_index].compressed_size)
+    if: header.header_version > 1
     repeat: expr
     repeat-expr: header.segments0
   segments1:
     type: file_body(segment_info1[_index].img_offset, segment_info1[_index].compressed_size)
+    if: header.header_version > 1
     repeat: expr
     repeat-expr: header.segments1
   #version:
@@ -91,7 +98,7 @@ types:
       - id: hash
         size: hash_size
       - id: signature
-        size: sig_size
+        size: sig_size/8
   header_ext:
     seq:
       - id: sdk_version

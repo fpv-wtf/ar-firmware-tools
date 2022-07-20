@@ -21,7 +21,10 @@ Tools to deal with Artosyn ARTO v4 firmware image files. Inspired by [dji-firmwa
 ## Tips
 To make the ext4 file system from Avatar Sky mountable:
 
-    dd if=/dev/zero bs=1 seek=134217728 count=0 of=userapp0.bin
+    dd if=/dev/zero bs=1 seek=134217728 count=0 of=userapp0.img
+
+To extract the kernel zImage with u-boot tools
+dumpimage -T kernel -o kernel.zimage kernel0.img
 
 ## Format Definition
 Defined using [Kaitai](https://kaitai.io/) see [otra.ksy](./otra.ksy). You can use the [Kaitai IDE](https://ide.kaitai.io/) to fill in the blanks or explore files.
