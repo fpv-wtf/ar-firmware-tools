@@ -18,13 +18,38 @@ Tools to deal with Artosyn ARTO v4 firmware image files. Inspired by [dji-firmwa
     --help     Show help                                 [boolean]
     --version  Show version number                       [boolean]
 
-## Tips
-To make the ext4 file system from Avatar Sky mountable:
+## Scripts
+In order to make deep extraction of firmware packges easier some helper scripts are included. These scripts target Ubuntu Linux.
 
-    dd if=/dev/zero bs=1 seek=134217728 count=0 of=userapp0.img
+First, make sure you install [jefferson](https://github.com/sviehb/jefferson) for exrtacting JFFS2 file systems. Additionally, you'll need a copy of mefisto's [ext4 tools](https://github.com/mefistotelis/ext4) in the parent directory of ar-firmware-tools. Finally, install the lz4, cpio and device-tree-compiler packages for Ubuntu.
 
-To extract the kernel zImage with u-boot tools
-dumpimage -T kernel -o kernel.zimage kernel0.img
+You can achieve this by running (presuming starting in the ar-firmware-tools folder):
+
+    sudo apt update
+    sudo apt install python3-pip liblzo2-dev cpio device-tree-compiler lz4
+    git clone https://github.com/sviehb/jefferson.git ../jefferson
+    cd ../jefferson
+    sudo python3 -m pip install -r requirements.txt
+    sudo python3 setup.py install
+    git clone https://github.com/mefistotelis/ext4 ../ext4
+    cd ../ar-firmware-tools
+
+### Deep Extract Avatar FW
+Use `scripts/avatar_extract.sh ${otra_image} [target_folder]` to deeply extract an Avatar_*.img firwmare update. Eg:
+
+    scripts/avatar_extract.sh Avatar_Gnd_23.23.4.img
+
+This will:
+ - Extract the top level OTRA image
+ - Extract any child OTRA images (effectively just stripping the OTRA header as they are all simple V1 images)
+ - Extract the kernel initramfs ("rootfs") out of the kernel image to $target_folder/filesystem
+ - Extract the JFFS2 or EXT4 userapp partition to $target_folder/filesystem
+ - Convert the dtb to dts (human readable format)
+
+### Extract rootfs from lz4 vmlinuz
+If you just want to extract an lz4 rootfs out of a self extracint lz4 kernel image (u-boot or vmlinuz) do the following:
+
+    scripts/lz4_rootfs_extract.sh vmlinuz rootfs_folder
 
 ## Format Definition
 Defined using [Kaitai](https://kaitai.io/) see [otra.ksy](./otra.ksy). You can use the [Kaitai IDE](https://ide.kaitai.io/) to fill in the blanks or explore files.
