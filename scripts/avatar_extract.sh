@@ -2,7 +2,7 @@
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 OTRA=${SCRIPT_DIR}/../otra.js
-EXT4="python ${SCRIPT_DIR}/../../ext4/ext4_cp.py"
+EXT4="python3 ${SCRIPT_DIR}/../../ext4/ext4_cp.py"
 KERNEL_EXTRACT=${SCRIPT_DIR}/lz4_rootfs_extract.sh
 
 IMAGE=$1

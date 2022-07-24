@@ -2,6 +2,9 @@
 
 Tools to deal with Artosyn ARTO v4 firmware image files. Inspired by [dji-firmware-tools](https://github.com/o-gs/dji-firmware-tools).
 
+## Prequisites
+Make sure you have nodejs 16 or above and npm installed. You can use [nvm](https://github.com/nvm-sh/nvm) to do so. 
+
 ## Installing
     git clone https://github.com/fpv-wtf/ar-firmware-tools
     cd ar-firmware-tools
@@ -26,7 +29,7 @@ First, make sure you install [jefferson](https://github.com/sviehb/jefferson) fo
 You can achieve this by running (presuming starting in the ar-firmware-tools folder):
 
     sudo apt update
-    sudo apt install python3-pip liblzo2-dev cpio device-tree-compiler lz4
+    sudo apt install python3 python3-pip liblzo2-dev cpio device-tree-compiler lz4
     git clone https://github.com/sviehb/jefferson.git ../jefferson
     cd ../jefferson
     sudo python3 -m pip install -r requirements.txt
@@ -43,7 +46,7 @@ This will:
  - Extract the top level OTRA image
  - Extract any child OTRA images (effectively just stripping the OTRA header as they are all simple V1 images)
  - Extract the kernel initramfs ("rootfs") out of the kernel image to $target_folder/filesystem
- - Extract the JFFS2 or EXT4 userapp partition to $target_folder/filesystem
+ - Extract the JFFS2 or EXT4 userapp partition to $target_folder/filesystem/local
  - Convert the dtb to dts (human readable format)
 
 ### Extract rootfs from lz4 vmlinuz
