@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-OTRA=${SCRIPT_DIR}/../otra.js
+OTRA="${SCRIPT_DIR}/../otra.js"
 EXT4="python3 ${SCRIPT_DIR}/../../ext4/ext4_cp.py"
 KERNEL_EXTRACT=${SCRIPT_DIR}/lz4_rootfs_extract.sh
 
@@ -41,8 +41,8 @@ show_otra () {
 
 recurse_otra () {
     for f in $TMP_DIR/*.img; do 
-        if [ "$(dd if=$f bs=4 count=1 status=none)" = "OTRA" ]; then
-            extract_otra $f "${f}_extracted" || true #TODO fix nodejs memory error with big rom such as rtos
+        if [ "$(dd if=$f bs=4 count=1 status=none)" == "OTRA" ]; then
+            extract_otra $f "${f}_extracted" 
             if [ -f "${f}_extracted/rom.img" ]; then
                 mv "${f}_extracted/rom.img" $f
                 rm -rf "${f}_extracted"
@@ -53,8 +53,32 @@ recurse_otra () {
 
 function extract_kernel () {
     for f in $TMP_DIR/kernel*.img; do 
-        $KERNEL_EXTRACT $f "$TMP_DIR/filesystem"
+        if [ -f "$f" ]; then
+            $KERNEL_EXTRACT $f "$TMP_DIR/filesystem"
+        fi
     done
+}
+
+function extract_uiapp () {
+    if [ -f $TMP_DIR/uiapp.img ]; then
+        f=$TMP_DIR/uiapp.img
+        mkdir -p $TMP_DIR/filesystem/gui
+        type=$(file $f)
+        case $type in
+
+            *"jffs2"*)
+                jefferson -f -d $TMP_DIR/filesystem/gui $f
+                rm $f
+                ;;
+            *"ext4"*)
+                $EXT4 -R ${f}:. $TMP_DIR/filesystem/gui
+                rm $f
+                ;;
+            *)
+                echo  "unknown file system type: $type"
+                ;;
+        esac
+    fi
 }
 
 function extract_userapp () {
@@ -99,6 +123,7 @@ extract_otra $IMAGE $TMP_DIR
 recurse_otra
 extract_kernel
 extract_userapp
+extract_uiapp
 convert_dtb
 
 move_result

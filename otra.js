@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require('node:path');
 
 const Otra = require("./otra_reader/Otra");
+const OtraSpl = require("./otra_spl_reader/OtraSpl");
 const KaitaiStream = require('kaitai-struct/KaitaiStream');
 
 const lzo = require('lzo');
@@ -22,57 +23,80 @@ yargs(hideBin(process.argv))
       })
   }, (argv) => {
     const fileContent = fs.readFileSync(argv.image);
-    const parsedOtra = new Otra(new KaitaiStream(fileContent));
-
-    if(parsedOtra.header.headerVersion > 1) {
-      parsedOtra.partInfo0 = mapPartsToSegments(parsedOtra.partInfo0, parsedOtra.segmentInfo0, parsedOtra.segments0);
-      parsedOtra.partInfo1 = mapPartsToSegments(parsedOtra.partInfo1, parsedOtra.segmentInfo1, parsedOtra.segments1);
-    }
-
+    const type = getOtraType(fileContent);
     if(!argv.folder) {
-        argv.folder = "./"+path.basename(argv.image).replace(/.img$/, '');
+      argv.folder = "./"+path.basename(argv.image).replace(/.img$/, '');
     }
     if(!fs.existsSync(argv.folder))
     fs.mkdirSync(argv.folder)
-    console.log(`extracting image file: ${argv.image}`);
-
-    function writeFile(file, data, decompressedSize, append) {
-        console.log("writing: "+argv.folder+"/"+file + (append ? " +" : ""))
-        const buffer = Buffer.from(data)
-        fs.writeFileSync(argv.folder+"/"+file, (decompressedSize && parsedOtra.header.compressed ? lzo.decompress(buffer, decompressedSize) : buffer), 
-        append ? {
-          flag: "a+"
-        } : null)
-    }
-    if(parsedOtra.header.romSize > 0) {
-      writeFile("rom.img", parsedOtra.rom)
-    }
-    if(parsedOtra.header.loaderSize > 0) {
-      writeFile("loader.img", parsedOtra.loader)
-    }
-    if(parsedOtra.header.envSize > 0) {
-      writeFile("env.img", parsedOtra.env)
-    }    
-
-    function writePart(part) {
-      part.segments.forEach((segment, index) => {
-        writeFile(part.name+".img", segment.data.body, segment.decompressedSize, (index !== 0))
-      })
-    }
-
-    if(parsedOtra.header.headerVersion > 1) {
-      parsedOtra.partInfo0.forEach(writePart);
-      parsedOtra.partInfo1.forEach(writePart);
-    }
-
     
+    if(type === "normal") {
+      const parsedOtra = new Otra(new KaitaiStream(fileContent));
 
-    /*parsedOtra.segmentInfo0.forEach((segment, index) => {
-        const partitions = parsedOtra.partInfo0.filter((part)=>{ return part.flashOffset === segment.flashOffset}).map((part) => { return part.name })
-        const partition = partitions.length ? partitions.pop() : segment.flashOffset
-        writeFile(partition+".bin", parsedOtra.segments0[index].body, segment.decompressedSize)
-    })
-    */
+      if(parsedOtra.header.headerVersion > 1) {
+        parsedOtra.partInfo0 = mapPartsToSegments(parsedOtra.partInfo0, parsedOtra.segmentInfo0, parsedOtra.segments0);
+        parsedOtra.partInfo1 = mapPartsToSegments(parsedOtra.partInfo1, parsedOtra.segmentInfo1, parsedOtra.segments1);
+      }
+  
+      console.log(`extracting image file: ${argv.image}`);
+  
+      function writeFile(file, data, decompressedSize, append) {
+          console.log("writing: "+argv.folder+"/"+file + (append ? " +" : ""))
+          const buffer = Buffer.from(data)
+          fs.writeFileSync(argv.folder+"/"+file, (decompressedSize && parsedOtra.header.compressed ? lzo.decompress(buffer, decompressedSize) : buffer), 
+          append ? {
+            flag: "a+"
+          } : null)
+      }
+      if(parsedOtra.header.romSize > 0) {
+        writeFile("rom.img", parsedOtra.rom)
+      }
+      if(parsedOtra.header.loaderSize > 0) {
+        writeFile("loader.img", parsedOtra.loader)
+      }
+      if(parsedOtra.header.envSize > 0) {
+        writeFile("env.img", parsedOtra.env)
+      }    
+  
+      function writePart(part) {
+        part.segments.forEach((segment, index) => {
+          writeFile(part.name+".img", segment.data.body, segment.decompressedSize, (index !== 0))
+        })
+      }
+  
+      if(parsedOtra.header.headerVersion > 1) {
+        parsedOtra.partInfo0.forEach(writePart);
+        parsedOtra.partInfo1.forEach(writePart);
+      }
+  
+      /*parsedOtra.segmentInfo0.forEach((segment, index) => {
+          const partitions = parsedOtra.partInfo0.filter((part)=>{ return part.flashOffset === segment.flashOffset}).map((part) => { return part.name })
+          const partition = partitions.length ? partitions.pop() : segment.flashOffset
+          writeFile(partition+".bin", parsedOtra.segments0[index].body, segment.decompressedSize)
+      })
+      */
+    }
+    else if(type === "spl") {
+      function writeFile(file, data) {
+        console.log("writing: "+argv.folder+"/"+file)
+        const buffer = Buffer.from(data)
+        fs.writeFileSync(argv.folder+"/"+file, buffer);
+      }
+      const parsedOtra = new OtraSpl(new KaitaiStream(fileContent));
+      if(parsedOtra.header.splLen > 0) {
+        writeFile("spl.img", parsedOtra.spl);
+      }
+      if(parsedOtra.header.trootLen > 0) {
+        writeFile("troot.img", parsedOtra.troot);
+      }
+      if(parsedOtra.header.signatureLen > 0) {
+        writeFile("signature.img", parsedOtra.signature);
+      }
+    }
+    else {
+      throw "Unknown image type";
+    }
+    
 
 
 
@@ -84,14 +108,16 @@ yargs(hideBin(process.argv))
       })
   }, (argv) => {
     const fileContent = fs.readFileSync(argv.image);
-    const parsedOtra = new Otra(new KaitaiStream(fileContent));
+    const type = getOtraType(fileContent);
+    if(type === "normal") {
+      const parsedOtra = new Otra(new KaitaiStream(fileContent));
 
-    if(parsedOtra.header.headerVersion > 1) {
-      parsedOtra.partInfo0 = mapPartsToSegments(parsedOtra.partInfo0, parsedOtra.segmentInfo0, parsedOtra.segments0);
-      parsedOtra.partInfo1 = mapPartsToSegments(parsedOtra.partInfo1, parsedOtra.segmentInfo1, parsedOtra.segments1);
-    }
-    console.log(`image file: ${argv.image}
-    
+      if(parsedOtra.header.headerVersion > 1) {
+        parsedOtra.partInfo0 = mapPartsToSegments(parsedOtra.partInfo0, parsedOtra.segmentInfo0, parsedOtra.segments0);
+        parsedOtra.partInfo1 = mapPartsToSegments(parsedOtra.partInfo1, parsedOtra.segmentInfo1, parsedOtra.segments1);
+      }
+      console.log(`image file: ${argv.image}
+      
 header version: ${parsedOtra.header.headerVersion}
 
 hash size:${parsedOtra.header.hashSize}
@@ -123,63 +149,109 @@ segments1 count:${parsedOtra.header.segments1}
 
 partitions0:`);
 
-      console.table(parsedOtra.partInfo0.map((part)=>{
-          return {
-              name: part.name,
-              offset: part.flashOffset,
-              size: humanFileSize(part.length),
-              upgrade: Boolean(part.isUpgrade),
-              segments: part.segments.length
-          }
-      }))
-      if(parsedOtra.header.partitions1) {
-          console.log("partitions1:")
-          console.table(parsedOtra.partInfo1.map((part)=>{
-              return {
-                  name: part.name,
-                  offset: part.flashOffset,
-                  size: humanFileSize(part.length),
-                  upgrade: Boolean(part.isUpgrade),
-                  segments: part.segments.length
+        console.table(parsedOtra.partInfo0.map((part)=>{
+            return {
+                name: part.name,
+                offset: part.flashOffset,
+                size: humanFileSize(part.length),
+                upgrade: Boolean(part.isUpgrade),
+                segments: part.segments.length
+            }
+        }))
+        if(parsedOtra.header.partitions1) {
+            console.log("partitions1:")
+            console.table(parsedOtra.partInfo1.map((part)=>{
+                return {
+                    name: part.name,
+                    offset: part.flashOffset,
+                    size: humanFileSize(part.length),
+                    upgrade: Boolean(part.isUpgrade),
+                    segments: part.segments.length
 
-              }
-          }))
-      }
+                }
+            }))
+        }
 
-      console.log("segments0:");
-      console.table(parsedOtra.segmentInfo0.map((segment)=>{
-          return {
-              imgOffset: segment.imgOffset,
-              flashOffset: segment.flashOffset,
-              compressedSize: humanFileSize(segment.compressedSize),
-              decompressedSize: humanFileSize(segment.decompressedSize),
-              partition: parsedOtra.partInfo0.filter((part)=>{
-                  return segment.flashOffset >= part.flashOffset && segment.flashOffset < part.flashOffset + part.length
-              }).map((part) => { return part.name }).pop() 
-          }
-      }))
-      if(parsedOtra.header.segments1) {
-          console.log("segments1:")
-          console.table(parsedOtra.segmentInfo1.map((segment)=>{
-              return {
-                  imgOffset: segment.imgOffset,
-                  flashOffset: segment.flashOffset,
-                  compressedSize: humanFileSize(segment.compressedSize),
-                  decompressedSize: humanFileSize(segment.decompressedSize),
-                  partition: parsedOtra.partInfo1.filter((part)=>{
+        console.log("segments0:");
+        console.table(parsedOtra.segmentInfo0.map((segment)=>{
+            return {
+                imgOffset: segment.imgOffset,
+                flashOffset: segment.flashOffset,
+                compressedSize: humanFileSize(segment.compressedSize),
+                decompressedSize: humanFileSize(segment.decompressedSize),
+                partition: parsedOtra.partInfo0.filter((part)=>{
                     return segment.flashOffset >= part.flashOffset && segment.flashOffset < part.flashOffset + part.length
-                  }).map((part) => { return part.name })
-              }
-          }))
+                }).map((part) => { return part.name }).pop() 
+            }
+        }))
+        if(parsedOtra.header.segments1) {
+            console.log("segments1:")
+            console.table(parsedOtra.segmentInfo1.map((segment)=>{
+                return {
+                    imgOffset: segment.imgOffset,
+                    flashOffset: segment.flashOffset,
+                    compressedSize: humanFileSize(segment.compressedSize),
+                    decompressedSize: humanFileSize(segment.decompressedSize),
+                    partition: parsedOtra.partInfo1.filter((part)=>{
+                      return segment.flashOffset >= part.flashOffset && segment.flashOffset < part.flashOffset + part.length
+                    }).map((part) => { return part.name })
+                }
+            }))
+        }
       }
     }
+    else if(type === "spl") {
+      const parsedOtra = new OtraSpl(new KaitaiStream(fileContent));
+      console.log(`spl image file: ${argv.image}
+
+version: ${parsedOtra.header.version}
+image type: ${parsedOtra.header.imgType}
+checksum: 0x${parsedOtra.header.checksum.toString(16)}
+
+spl load address: 0x${parsedOtra.header.splLoadAddr.toString(16)}
+spl length: ${parsedOtra.header.splLen}
+
+troot load address: 0x${parsedOtra.header.trootLoadAddr.toString(16)}
+troot length: ${parsedOtra.header.trootLen}
+
+signature load address: 0x${parsedOtra.header.signatureLoadAddr.toString(16)}
+signature length: ${parsedOtra.header.signatureLen}
+`);
+      
+    }
+    else {
+      throw "Unknown image type";
+    }
+  
   })
   .strictCommands()
   .demandCommand(1)
   .parse()
 
+function isZero(buf, start, len) {
+  const target = buf.slice(start, start+len)
+  for (var i = 0; i < len; i++) {
+    if (target.readUInt8(i) !==0) {
+        return false;
+    }
+  }
+  return true;
+}
 
-// i don't think this can be trivially done with kaitai but would be happy ot be proven wrong
+function getOtraType(buf) {
+  const magic = buf.toString("ascii", 0, 4);
+  if(magic !== "OTRA") {
+    return "unknown";
+  }
+  if(isZero(buf, 4, 8) && !isZero(buf, 36, 4) && isZero(buf, 40, 4*6)) {
+    return "spl"
+  }
+  else {
+    return "normal"
+  }
+}
+
+// i don't think this can be trivially done with kaitai but would be happy to be proven wrong
 function mapPartsToSegments(parts, segments, datas) {
   segments = segments.map((segment, index)=>{ return {...segment, data:datas[index]} })
   return parts.map((part)=>{ 
