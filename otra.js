@@ -3,7 +3,8 @@ const fs = require("fs");
 const path = require('node:path');
 
 const Otra = require("./otra_reader/Otra");
-const OtraSpl = require("./otra_spl_reader/OtraSpl");
+const OtraSpl = require("./otra_reader/OtraSpl");
+const OtraSirius = require("./otra_reader/OtraSirius");
 const KaitaiStream = require('kaitai-struct/KaitaiStream');
 
 const lzo = require('lzo');
@@ -11,6 +12,7 @@ const lzo = require('lzo');
 const yargs = require('yargs/yargs')
 const { hideBin } = require('yargs/helpers');
 const { parse } = require("path");
+const { parsed } = require("yargs");
 
 yargs(hideBin(process.argv))
 .command('extract <image> [folder]', 'extract the OTRA image', (yargs) => {
@@ -93,15 +95,23 @@ yargs(hideBin(process.argv))
         writeFile("signature.img", parsedOtra.signature);
       }
     }
+    else if(type === "sirius") {
+      function writeFile(file, data) {
+        console.log("writing: "+argv.folder+"/"+file)
+        const buffer = Buffer.from(data)
+        fs.writeFileSync(argv.folder+"/"+file, buffer);
+      }
+      const parsedOtra = new OtraSirius(new KaitaiStream(fileContent));
+      if(parsedOtra.header.imgLen > 0) {
+        writeFile("rom.img", parsedOtra.image);
+      }
+    }
     else {
       throw "Unknown image type";
     }
-    
 
-
-
-  })
-  .command('info <image>', 'show info on the OTRA image', (yargs) => {
+})
+.command('info <image>', 'show info on the OTRA image', (yargs) => {
     return yargs
       .positional('image', {
         describe: 'image to process'
@@ -219,14 +229,63 @@ signature length: ${parsedOtra.header.signatureLen}
 `);
       
     }
+    else if(type === "sirius") {
+      const parsedOtra = new OtraSirius(new KaitaiStream(fileContent));
+      const ourCheck = checksum(parsedOtra.image);
+      if(ourCheck !== parsedOtra.header.checksum) {
+        console.log("checksum mismatch! "+ourCheck.toString(16)+"!=="+parsedOtra.header.checksum.toString(16))
+      }
+      console.log(`sirius image file: ${argv.image}
+
+version: ${parsedOtra.header.version}
+image type: ${parsedOtra.header.imgType}
+checksum: 0x${parsedOtra.header.checksum.toString(16)}
+
+hash length: ${parsedOtra.header.hashSize}
+signature length: ${parsedOtra.header.sigLen}
+
+hash: ${parsedOtra.hash.toString(16)}
+signature: ${parsedOtra.sig.toString(16)}
+
+load address: 0x${parsedOtra.header.imgLoadAddr.toString(16)}
+length: ${parsedOtra.header.imgLen}
+`);
+    }
     else {
       throw "Unknown image type";
     }
   
-  })
-  .strictCommands()
-  .demandCommand(1)
-  .parse()
+})
+.command('pack <type> <loadaddress> <input> <output>', 'pack a sirius OTRA image', (yargs) => {
+  return yargs
+    .positional('type', {
+      describe: 'must be "sirius"'
+    })
+    .positional('loadaddress', {
+      describe: 'image load address"'
+    })
+    .positional('input', {
+      describe: 'input raw image'
+    })
+    .positional('output', {
+      describe: 'output sirius OTRA image'
+    })
+}, (argv) => {
+  if(argv.type !== "sirius") {
+    throw "unsupported image type"
+  }
+  const image = fs.readFileSync(argv.input);
+  const sum = checksum(image);
+  const otra = Buffer.concat([Buffer.from("OTRA", "ascii"), Buffer.alloc(60), image])
+  otra.writeUint32LE(parseInt(argv.loadaddress), 0xc);
+  otra.writeUint32LE(image.length, 0x10);
+  otra.writeUint32LE(sum, 0x20);
+  fs.writeFileSync(argv.output, otra)
+  
+})
+.strictCommands()
+.demandCommand(1)
+.parse()
 
 function isZero(buf, start, len) {
   const target = buf.slice(start, start+len)
@@ -245,6 +304,9 @@ function getOtraType(buf) {
   }
   if(isZero(buf, 4, 8) && !isZero(buf, 36, 4) && isZero(buf, 40, 4*6)) {
     return "spl"
+  }
+  else if(isZero(buf, 4, 8) && !isZero(buf, 32, 4) && isZero(buf, 36, 4*7)) {
+    return "sirius"
   }
   else {
     return "normal"
@@ -287,3 +349,16 @@ function humanFileSize(bytes, si=false, dp=1) {
     return bytes.toFixed(dp) + ' ' + units[u];
   }
   
+
+function checksum(data) {
+  //just sum up all the bytes
+  const buf = Buffer.from(data);
+  let result = 0;
+    
+  const len = buf.length;
+  for (let i = 0; i < len; i++) {
+    result += buf.readUInt8(i);
+    result = result & 0xffffffff;
+  }
+  return result;
+}
